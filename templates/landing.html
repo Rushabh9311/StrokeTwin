@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}StrokeTwin — Heart health, made easier to explore{% endblock %}
+
+{% block content %}
+<div class="landing-page">
+  <section class="landing-hero">
+    <div class="landing-copy">
+      <div class="landing-eyebrow"><span class="landing-eyebrow-dot"></span> PROACTIVE HEART HEALTH WORKSPACE</div>
+      <h1>See the signals.<br><span>Understand the story.</span></h1>
+      <p class="landing-lede">StrokeTwin puts a virtual patient’s health history, a sample ECG, and simulated wearable readings in one place. Clinicians can explore what each signal shows.</p>
+      <div class="landing-actions">
+        <a class="landing-primary" href="/dashboard">Explore the dashboard <span aria-hidden="true">→</span></a>
+        <a class="landing-secondary" href="#how-it-works">How it works <span aria-hidden="true">↓</span></a>
+      </div>
+      <div class="landing-trust"><span class="landing-shield" aria-hidden="true">✓</span> Sample data only · Made for learning and exploration</div>
+    </div>
+
+    <div class="heart-visual" role="img" aria-label="Illustration of a glowing heart with an ECG pulse line">
+      <div class="heart-orbit orbit-one"></div>
+      <div class="heart-orbit orbit-two"></div>
+      <div class="heart-glow"></div>
+      <svg class="heart-art" viewBox="0 0 420 420" aria-hidden="true">
+        <defs>
+          <linearGradient id="heartFill" x1="70" y1="60" x2="335" y2="350" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#a5f3cf"/><stop offset=".48" stop-color="#49c99e"/><stop offset="1" stop-color="#1b8d86"/>
+          </linearGradient>
+          <linearGradient id="pulseLine" x1="50" y1="205" x2="370" y2="205" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#d7fff0" stop-opacity=".2"/><stop offset=".35" stop-color="#f4fff9"/><stop offset=".75" stop-color="#c9fff0"/><stop offset="1" stop-color="#d7fff0" stop-opacity=".3"/>
+          </linearGradient>
+          <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <circle cx="210" cy="210" r="150" fill="none" stroke="#7ad9b5" stroke-opacity=".12"/>
+        <circle cx="210" cy="210" r="125" fill="none" stroke="#9be8c9" stroke-opacity=".13" stroke-dasharray="2 9"/>
+        <path d="M210 337C191 318 91 245 70 177 48 105 97 70 143 75c31 3 53 22 67 46 15-24 37-43 68-46 46-5 95 30 73 102-21 68-121 141-141 160Z" fill="url(#heartFill)" fill-opacity=".94" stroke="#baf5d8" stroke-opacity=".75" stroke-width="2"/>
+        <path d="M48 211h93l20-32 27 76 32-119 30 88 19-29h103" fill="none" stroke="url(#pulseLine)" stroke-linecap="round" stroke-linejoin="round" stroke-width="7" filter="url(#softGlow)"/>
+        <circle cx="210" cy="136" r="4" fill="#eafff3"/><circle cx="340" cy="260" r="3" fill="#a1ebcc"/>
+      </svg>
+      <div class="heart-data-chip chip-ecg"><span class="chip-wave">⌁</span><span><strong>ECG rhythm</strong><small>Signal inspection</small></span></div>
+      <div class="heart-data-chip chip-twin"><span class="chip-dot"></span><span><strong>One virtual profile</strong><small>Context · signal · timeline</small></span></div>
+      <div class="heart-caption"><span class="caption-pulse"></span> A clearer view of heart-health data</div>
+    </div>
+  </section>
+
+  <section class="landing-intro" id="how-it-works">
+    <div class="intro-heading"><div class="landing-section-kicker">THREE THINGS TO EXPLORE</div><h2>See the profile, ECG, and wearable data.</h2><p>Open a virtual patient to see the information side by side.</p></div>
+    <div class="landing-feature-grid">
+      <article class="landing-feature-card"><div class="feature-number">01</div><div class="feature-symbol profile-symbol">⌘</div><h3>Health profile</h3><p>See a sample patient’s health history and the factors used in its score.</p><span class="feature-source">SAMPLE HEALTH DATA</span></article>
+      <article class="landing-feature-card"><div class="feature-number">02</div><div class="feature-symbol ecg-symbol">⌁</div><h3>ECG sample</h3><p>Play a public ECG recording and see how the model marks heartbeats.</p><span class="feature-source">PUBLIC ECG RECORDING</span></article>
+      <article class="landing-feature-card"><div class="feature-number">03</div><div class="feature-symbol wear-symbol">◷</div><h3>Wearable readings</h3><p>View example steps, sleep, heart rate, and HRV readings over time.</p><span class="feature-source">SIMULATED READINGS</span></article>
+    </div>
+  </section>
+
+  <section class="landing-limits">
+    <div class="limits-icon" aria-hidden="true">♥</div>
+    <div><div class="landing-section-kicker">IMPORTANT LIMITS</div><h2>Built for learning and exploration.</h2><p>StrokeTwin does not diagnose AFib or predict a person’s stroke. The patient profiles and wearable readings are simulated. Public ECG samples are randomly assigned to profiles; they are not matched patient recordings.</p></div>
+    <a href="/dashboard" class="limits-link">View patient dashboard <span aria-hidden="true">→</span></a>
+  </section>
+
+  <section class="landing-bottom-cta"><div><div class="landing-section-kicker">TAKE A CLOSER LOOK</div><h2>Explore StrokeTwin.</h2><p>Open a sample patient profile to see its health data and ECG walkthrough.</p></div><a class="landing-primary" href="/dashboard">Go to dashboard <span aria-hidden="true">→</span></a></section>
+</div>
+{% endblock %}

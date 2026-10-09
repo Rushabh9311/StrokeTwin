@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# Local settings and secrets
+.env
+.env.*
+!.env.example
+.vscode/
+
+# Local datasets: keep large/third-party source files out of the repository
+# See DATASETS.md for source and attribution details.
+data/
+
+# Generated application files
+*.log
+*.sqlite
+*.sqlite3
+*.db
+tmp/
+
+# Operating system files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}ECG model card — StrokeTwin{% endblock %}
+
+{% block content %}
+<div class="model-card-page">
+  <section class="model-page-heading">
+    <div><div class="eyebrow"><span class="eyebrow-line"></span> HOW THE MODEL WORKS</div><h1>About the ECG model<span class="heading-period">.</span></h1><p>Four rhythm classes, with unclear samples routed to an inconclusive result.</p></div>
+    <a class="model-back-link" href="/dashboard">← Patient overview</a>
+  </section>
+
+  {% if evaluation %}
+  <section class="model-intro-note"><span class="notice-icon">i</span><p><strong>Public dataset experiment only.</strong> These are recording-level results from a random holdout of the public dataset. The source files do not include subject identifiers, and no external clinical validation has been performed.</p></section>
+
+  <section class="model-metrics-grid model-metrics-five" aria-label="Classifier evaluation metrics">
+    <article class="model-metric"><span>FOUR-CLASS ACCURACY</span><strong>{{ (evaluation.accuracy * 100) | round(1) }}<small>%</small></strong><small class="model-metric-help">Across normal, AFib, other, and noisy classes</small></article>
+    <article class="model-metric"><span>MACRO F1</span><strong>{{ (evaluation.macro_f1 * 100) | round(1) }}<small>%</small></strong><small class="model-metric-help">Weights each ECG class equally</small></article>
+    <article class="model-metric"><span>AFIB SAMPLES FOUND</span><strong>{{ (evaluation.afib_sensitivity * 100) | round(1) }}<small>%</small></strong><small class="model-metric-help">AFib class recall at argmax</small></article>
+    <article class="model-metric metric-score"><span>AFIB OVR ROC-AUC</span><strong>{{ (evaluation.afib_ovr_roc_auc * 100) | round(1) }}<small>%</small></strong><small class="model-metric-help">AFib versus all other reference labels</small></article>
+    <article class="model-metric"><span>5-FOLD CV MACRO F1</span><strong>{{ (evaluation.five_fold_cv.macro_f1.mean * 100) | round(1) }}<small>%</small></strong><small class="model-metric-help">Mean ± {{ (evaluation.five_fold_cv.macro_f1.std * 100) | round(1) }} points</small></article>
+  </section>
+
+  <section class="model-detail-grid">
+    <article class="model-detail-card">
+      <div class="card-kicker">TEST SETUP</div><h2>What the model was evaluated on</h2>
+      <dl class="model-facts">
+        <div><dt>Classifier</dt><dd>{{ evaluation.model }}</dd></div>
+        <div><dt>Class confidence floor</dt><dd>{{ evaluation.minimum_class_confidence }}</dd></div>
+        <div><dt>Data split</dt><dd>{{ evaluation.split }}</dd></div>
+        <div><dt>Training recordings</dt><dd>{{ evaluation.n_train }}</dd></div>
+        <div><dt>Held-out recordings</dt><dd>{{ evaluation.n_test }}</dd></div>
+      </dl>
+      <div class="model-caution">{{ evaluation.decision_rule }} Probability bins below show AFib class probability on the same held-out set; they do not calibrate the model.</div>
+    </article>
+
+    <article class="model-detail-card">
+      <div class="card-kicker">RESULTS BY ECG REFERENCE CLASS</div><h2>Performance for each label</h2>
+      <div class="model-table-scroll"><table class="model-report-table"><thead><tr><th>Reference class</th><th>Precision</th><th>Recall</th><th>F1</th><th>Samples</th></tr></thead><tbody>
+        {% for label in evaluation.classes %}
+        {% set row = evaluation.classification_report[label] %}
+        <tr><td><strong>{{ label }}</strong></td><td>{{ (row.precision * 100) | round(1) }}%</td><td>{{ (row.recall * 100) | round(1) }}%</td><td>{{ (row['f1-score'] * 100) | round(1) }}%</td><td>{{ row.support }}</td></tr>
+        {% endfor %}
+      </tbody></table></div>
+      <p class="model-table-explainer">Other-rhythm and noisy classes are shown as inconclusive in the patient workflow, rather than being reported as “no AFib.”</p>
+    </article>
+  </section>
+
+  <section class="model-detail-card routing-card">
+    <div class="card-kicker">RESULT INTERPRETATION</div><h2>How held-out recordings would be shown</h2>
+    <p class="model-table-explainer">Low-confidence predictions and the other-rhythm/noisy classes are routed to an inconclusive state rather than “no AFib.”</p>
+    <dl class="model-facts routing-facts">
+      {% for state, count in evaluation.operational_state_counts.items() %}
+      <div><dt>{{ state }}</dt><dd>{{ count }}</dd></div>
+      {% endfor %}
+    </dl>
+  </section>
+
+  <section class="model-detail-card matrix-card">
+    <div class="card-kicker">HELD-OUT RECORDINGS</div><h2>Four-class confusion matrix</h2>
+    <p class="model-table-explainer">Rows are dataset reference labels; columns are model predictions.</p>
+    <div class="model-table-scroll"><table class="model-report-table matrix-table"><thead><tr><th>Reference ↓ / Model →</th>{% for label in evaluation.classes %}<th>{{ label }}</th>{% endfor %}</tr></thead><tbody>
+      {% for label in evaluation.classes %}
+      {% set matrix_row = evaluation.confusion_matrix[loop.index0] %}
+      <tr><td><strong>{{ label }}</strong></td>{% for count in matrix_row %}<td>{{ count }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="model-detail-card calibration-card">
+    <div class="calibration-heading"><div><div class="card-kicker">MODEL PROBABILITIES</div><h2>AFib probability versus held-out labels</h2><p>This one-vs-rest chart compares predicted AFib-class probability with the fraction labeled AFib in each bin. It is a dataset check, not validation on new patients.</p></div><span class="calibration-legend"><i class="legend-ideal"></i> Ideal <i class="legend-observed"></i> Held-out bins</span></div>
+    <div class="calibration-chart-wrap"><canvas id="calibrationChart" aria-label="AFib model probability calibration chart"></canvas></div>
+  </section>
+
+  <section class="model-final-note"><strong>Scope:</strong> This model classifies short public ECG recordings. It does not predict stroke. CHA₂DS₂-VASc reference values, the separate WHO 10-year combined CVD chart, and simulated wearable readings are not model inputs. This research prototype is not approved for clinical use.</section>
+  {% else %}
+  <section class="model-empty-state"><div class="empty-icon">◌</div><h2>Train the updated four-class model</h2><p>The saved model report is from the earlier binary classifier. Train the new model to show separate normal, AFib, other-rhythm, and noisy-recording results. Until then, ECG classifications remain inconclusive.</p><code>python .\train_afib_classifier.py</code><a class="landing-primary" href="/dashboard">Back to patient dashboard <span aria-hidden="true">→</span></a></section>
+  {% endif %}
+</div>
+
+{% if evaluation %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+  const calibrationBins = {{ calibration_bins | tojson }};
+  const canvas = document.getElementById("calibrationChart");
+  if (window.Chart && canvas) {
+    new Chart(canvas, {
+      type: "scatter",
+      data: { datasets: [
+        { label: "Ideal calibration", data: [{x:0,y:0},{x:1,y:1}], showLine: true, borderColor: "#b4c2be", borderDash: [5,5], pointRadius: 0, borderWidth: 1.5 },
+        { label: "Observed bins", data: calibrationBins, showLine: true, borderColor: "#138276", backgroundColor: "#138276", pointRadius: 5, pointHoverRadius: 7, borderWidth: 2, tension: .15 }
+      ] },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: item => `Predicted ${item.parsed.x.toFixed(2)} · observed ${item.parsed.y.toFixed(2)}` } } },
+        scales: {
+          x: { type: "linear", min: 0, max: 1, title: { display: true, text: "Mean predicted AFib probability" }, grid: { color: "#edf2ef" } },
+          y: { min: 0, max: 1, title: { display: true, text: "Observed AFib fraction" }, grid: { color: "#edf2ef" } }
+        }
+      }
+    });
+  }
+</script>
+{% endif %}
+{% endblock %}

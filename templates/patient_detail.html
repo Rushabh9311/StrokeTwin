@@ -1,0 +1,734 @@
+{% extends "base.html" %}
+
+{% block title %}Patient #{{ patient.id }} — StrokeTwin{% endblock %}
+
+{% block content %}
+<a class="back-link" href="/dashboard"><span aria-hidden="true">←</span> All patient profiles</a>
+
+<section class="detail-heading">
+  <div class="detail-identity">
+    <div class="detail-avatar">{{ '%02d'|format(patient.id % 100) }}</div>
+    <div><div class="eyebrow">SIMULATED PATIENT PROFILE</div><h1>Patient #{{ patient.id }}</h1><p>{{ patient.age }} years <span>·</span> {{ 'Female' if patient.sex == 'F' else 'Male' }}</p></div>
+  </div>
+  {% if latest %}<span class="badge badge-{{ latest.alert_level }} badge-large"><span class="badge-dot"></span>{% if latest.alert_level == 'inconclusive' %}ECG inconclusive{% else %}{{ latest.alert_level }} experimental review band{% endif %}</span>{% endif %}
+</section>
+
+<section class="notice notice-detail" role="note">
+  <span class="notice-icon">i</span>
+  <p>This profile uses sample data. Its ECG is public, not this patient’s recording. Scores are examples, not a diagnosis or personal stroke prediction.</p>
+</section>
+
+<nav class="patient-quicknav" aria-label="Patient page sections">
+  <a href="#trend-watch">Data check</a>
+  <a href="#review">Review</a>
+  <a href="#risk-snapshot">Risk snapshot</a>
+  <a href="#prevention">Prevention</a>
+  <a href="#activity">Wearables</a>
+  <a href="#habits">Healthy habits</a>
+  <a href="#sample-history">History</a>
+</nav>
+
+<section id="trend-watch" class="detail-card trend-watch-card patient-page-section">
+  <div class="trend-watch-heading">
+    <div><div class="card-kicker"><span class="kicker-icon wearable-kicker">⌁</span> WEARABLE TREND + PROFILE CONTEXT</div><h2>Profile context + wearable trend</h2></div>
+    {% if wearable_watch.status == 'cross_stream_watch' %}
+    <span class="watch-label watch-label-active">Review suggested</span>
+    {% elif wearable_watch.status == 'wearable_trend' %}
+    <span class="watch-label">Wearable trend changed</span>
+    {% elif wearable_watch.status == 'insufficient' %}
+    <span class="watch-label">More readings needed</span>
+    {% else %}
+    <span class="watch-label">Watch criteria not met</span>
+    {% endif %}
+  </div>
+  <p class="trend-watch-summary">{{ wearable_watch.summary }}</p>
+  {% if wearable_watch.triggered %}
+  <p class="trend-watch-queue-link"><a class="row-arrow" href="/dashboard/review-queue">Open review queue <span aria-hidden="true">→</span></a></p>
+  {% endif %}
+  <div class="trend-watch-columns">
+    <div class="trend-watch-column">
+      <h3>Wearable changes <span>first 3 vs latest 3 readings</span></h3>
+      {% if wearable_watch.changes %}
+      <ul class="trend-change-list">
+        {% for item in wearable_watch.changes %}
+        <li><span>{{ item.label }}</span><strong class="{% if item.crossed %}trend-crossed{% endif %}">{{ '%+.1f'|format(item.delta_pct) }}%</strong><small>{{ item.baseline }} → {{ item.recent }} {{ item.unit }}{% if item.crossed %} · illustrative threshold crossed{% endif %}</small></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="trend-empty">Seven daily sample readings appear here when wearable data is available.</p>
+      {% endif %}
+    </div>
+    <div class="trend-watch-column">
+      <h3>Profile context <span>synthetic EHR</span></h3>
+      {% if wearable_watch.context_factors %}
+      <ul class="context-factor-list">{% for factor in wearable_watch.context_factors %}<li>{{ factor }}</li>{% endfor %}</ul>
+      {% else %}
+      <p class="trend-empty">No listed context factors were found in this synthetic profile.</p>
+      {% endif %}
+    </div>
+  </div>
+  <p class="trend-watch-caveat"><strong>Illustrative rule, not a medical alert:</strong> a review suggestion appears when at least two wearable changes cross illustrative thresholds and the profile has at least one listed context factor. These thresholds are not clinically established. The unrelated public ECG is not used in this check, and the output does not predict stroke or another event.</p>
+</section>
+
+<section id="review" class="detail-card clinician-review-card patient-page-section">
+  <div class="review-header">
+    <div><div class="card-kicker"><span class="kicker-icon review-kicker">✓</span> REVIEW WORKFLOW</div><h2>Review this sample result</h2><p>Save a review disposition and note. This does not change the model output.</p></div>
+    {% if latest %}
+      {% if latest_review %}
+      <span id="reviewState" class="review-state-pill reviewed-state"><span class="review-state-dot"></span>{{ {'reviewed':'Reviewed','repeat_sample':'Repeat sample','follow_up':'Follow-up discussion'}.get(latest_review.disposition or 'reviewed', 'Reviewed') }} · {{ latest_review.reviewed_at.strftime('%b %d, %H:%M') }}</span>
+      {% else %}
+      <span id="reviewState" class="review-state-pill pending-state"><span class="review-state-dot"></span>Awaiting review</span>
+      {% endif %}
+    {% else %}
+    <span id="reviewState" class="review-state-pill pending-state"><span class="review-state-dot"></span>No assessment yet</span>
+    {% endif %}
+  </div>
+  {% if latest %}
+  <form id="clinicianReviewForm" class="review-form" data-url="/dashboard/patients/{{ patient.id }}/review">
+    <label for="reviewerName">Reviewer label <small>{% if review_auth_enabled %}Shared account · identity not clinically verified{% else %}Local entry · identity not verified{% endif %}</small></label>
+    <input id="reviewerName" name="reviewer_name" maxlength="80" required value="{{ demo_reviewer if review_auth_enabled else (latest_review.reviewer_name if latest_review and latest_review.reviewer_name else '') }}" placeholder="e.g. Reviewer"{% if review_auth_enabled %} readonly{% endif %}>
+    <label for="reviewDisposition">Review disposition</label>
+    <select id="reviewDisposition" name="disposition" required>
+      {% set current_disposition = latest_review.disposition if latest_review and latest_review.disposition else 'reviewed' %}
+      <option value="reviewed"{% if current_disposition == 'reviewed' %} selected{% endif %}>Reviewed</option>
+      <option value="repeat_sample"{% if current_disposition == 'repeat_sample' %} selected{% endif %}>Consider a repeat sample</option>
+      <option value="follow_up"{% if current_disposition == 'follow_up' %} selected{% endif %}>Follow-up discussion</option>
+    </select>
+    <label for="reviewNote">Optional note</label>
+    <textarea id="reviewNote" name="note" maxlength="1000" placeholder="Add a brief review note or follow-up consideration…">{% if latest_review %}{{ latest_review.note }}{% endif %}</textarea>
+    <div class="review-form-footer"><span id="reviewFeedback" class="review-feedback" aria-live="polite">{% if review_auth_enabled %}Shared account · no roles or clinical identity verification{% else %}Local review log · no sign-in or identity check{% endif %}</span><button id="markReviewedButton" class="review-submit" type="submit">{% if latest_review %}Save review update{% else %}Save review{% endif %}<span aria-hidden="true">→</span></button></div>
+  </form>
+  {% if review_events %}
+  <div class="review-history"><strong>Review activity</strong><ul id="reviewEventList">
+    {% for event in review_events %}
+    <li><span>{{ event.created_at.strftime('%b %d, %Y · %H:%M') }} · {{ event.reviewer_name }} · {{ {'reviewed':'Reviewed','repeat_sample':'Repeat sample','follow_up':'Follow-up discussion'}.get(event.disposition, event.disposition) }}</span>{% if event.note %}<small>{{ event.note }}</small>{% endif %}</li>
+    {% endfor %}
+  </ul></div>
+  {% endif %}
+  {% else %}
+  <div class="review-empty">There is no assessment to review for this profile yet.</div>
+  {% endif %}
+</section>
+
+<section id="risk-snapshot" class="detail-grid patient-page-section">
+  <article class="detail-card score-card">
+    <div class="card-kicker"><span class="kicker-icon">＋</span> HEALTH FACTOR SCORE</div>
+    <h2>CHA₂DS₂-VASc</h2>
+    <div class="score-display"><strong>{{ score }}</strong><span>/ 9</span></div>
+    <div class="score-meter" aria-label="Score {{ score }} out of 9"><span data-progress="{{ (score / 9 * 100) | round(0) }}"></span></div>
+    <p class="card-helper">CHA₂DS₂-VASc counts stroke-risk factors for people with AFib. It does not show whether someone has AFib.</p>
+    <div class="conditional-risk"><span>Historical reference per year, only if AFib is present</span><strong>{{ risk_pct }}<small>%</small></strong></div>
+    <p class="risk-source-note">Reference rates come from a 2012 Swedish AFib cohort; rates vary across populations. <a href="https://www.bmj.com/content/342/bmj.d124" target="_blank" rel="noopener noreferrer">Study and population context ↗</a></p>
+    <div class="factor-list">
+      {% for item in breakdown %}
+      <div class="factor-row"><span class="factor-check">✓</span><span>{{ item.factor }}</span><strong>+{{ item.points }}</strong></div>
+      {% else %}
+      <div class="factor-empty">No scored factors in this synthetic profile.</div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="detail-card signal-card">
+    <div class="card-kicker"><span class="kicker-icon signal-kicker">⌁</span> PUBLIC ECG SAMPLE</div>
+    <h2>Latest signal</h2>
+    {% if latest %}
+    <div class="signal-number">{{ (latest.afib_component * 100) | round(1) }}<small>%</small></div>
+    <p class="signal-label">Model score for an AFib-like pattern in this ECG sample, not a patient probability.</p>
+    <div class="ecg-result-state result-{{ latest.ecg_result or 'legacy' }}">{% if latest.ecg_result == 'afib_pattern' %}AFib pattern detected by model{% elif latest.ecg_result == 'no_afib_pattern' %}No AFib pattern detected by model{% elif latest.ecg_result == 'other_rhythm' %}Other rhythm · inconclusive for AFib{% elif latest.ecg_result == 'noisy_recording' %}Noisy recording · inconclusive{% elif latest.ecg_result == 'inconclusive_low_confidence' %}Low-confidence result · inconclusive{% elif latest.ecg_result == 'legacy_binary_model' %}Legacy binary model · inconclusive{% else %}Earlier binary model result · rebuild samples for 4-class output{% endif %}</div>
+    <div class="probability-track"><span data-progress="{{ (latest.afib_component * 100) | round(0) }}"></span></div>
+    <div class="output-row"><span>Experimental display index (not risk %)</span><strong>{% if latest.fused_risk_score is not none %}{{ latest.fused_risk_score | round(2) }}{% else %}—{% endif %}</strong></div>
+    <div class="output-row"><span>Profile factor score</span><strong>{{ score }} / 9</strong></div>
+    <div class="signal-foot"><span class="live-indicator"><span></span> Sampled ECG window</span><span>{{ latest.timestamp.strftime('%b %d, %Y') }}</span></div>
+    {% else %}
+    <div class="empty-signal"><span>◌</span><strong>No ECG results yet</strong><small>Add a sample ECG to see a model result.</small></div>
+    {% endif %}
+    <div class="model-note"><strong>About this result:</strong> It describes one short public ECG sample. It cannot confirm AFib in this patient and has not been clinically validated. The combined score is an experimental display index calculated from the AFib-class probability and a CHA₂DS₂-VASc reference estimate; it is not a personal stroke-risk prediction or an interpretable risk percentage.</div>
+  </article>
+</section>
+
+<details id="prevention" class="detail-card prevention-card collapsible-section patient-page-section">
+  <summary class="disclosure-summary">
+    <div>
+      <div class="card-kicker"><span class="kicker-icon prevention-kicker">◎</span> PREVENTION RISK CHECK</div>
+      <h2>10-year cardiovascular estimate</h2>
+      <p>WHO South Asia chart lookup for people in India, Bangladesh, Bhutan, Nepal, or Pakistan.</p>
+    </div>
+    <span class="disclosure-toggle" aria-hidden="true"></span>
+  </summary>
+  <div class="disclosure-body">
+  <a class="prevention-source-pill" href="https://cdn.who.int/media/docs/default-source/ncds/cvd-risk-non-laboratory-based-charts.pdf" target="_blank" rel="noopener noreferrer">WHO 2019 chart source ↗</a>
+  <div class="prevention-callout"><strong>This is separate from the ECG/AFib score.</strong> It estimates combined fatal or non-fatal stroke or heart-attack risk—not stroke alone. Enter measured values for a real person; the synthetic profile values are not prefilled or used.</div>
+  <form id="preventionRiskForm" class="prevention-form" data-url="/dashboard/patients/{{ patient.id }}/prevention-risk">
+    <label>Age <span>40–74 years</span><input name="age" type="number" min="40" max="74" required placeholder="e.g. 58"></label>
+    <label>Sex used by chart<select name="sex" required><option value="" selected disabled>Select</option><option value="F">Female</option><option value="M">Male</option></select></label>
+    <label>Current smoker<select name="smoker" required><option value="" selected disabled>Select</option><option value="false">No</option><option value="true">Yes</option></select></label>
+    <label>Systolic blood pressure <span>mmHg</span><input name="systolic_bp" type="number" min="70" max="250" step="1" required placeholder="e.g. 128"></label>
+    <label>BMI <span>kg/m²</span><input name="bmi" type="number" min="10" max="80" step="0.1" required placeholder="e.g. 24.5"></label>
+    <label>Known heart attack, stroke, or other cardiovascular disease?<select name="prior_cvd" required><option value="" selected disabled>Select</option><option value="false">No</option><option value="true">Yes</option></select></label>
+    <button class="prevention-submit" type="submit">Estimate from WHO chart <span aria-hidden="true">→</span></button>
+  </form>
+  <div id="preventionResult" class="prevention-result" hidden aria-live="polite">
+    <div class="prevention-result-top"><div><span class="result-label">10-year combined CVD risk band</span><strong id="preventionPercent">—</strong></div><span id="preventionBand" class="result-band"></span></div>
+    <p id="preventionNote"></p>
+    <ul id="preventionActions"></ul>
+  </div>
+  <p id="preventionError" class="prevention-error" role="alert" hidden></p>
+  <p class="prevention-footnote">Inputs are used for this calculation only and are not saved. The chart does not apply to people with prior cardiovascular disease or those outside its age and region limits. Confirm results and prevention choices with a healthcare professional.</p>
+  </div>
+</details>
+
+<section id="activity" class="detail-card wearable-card patient-page-section">
+  <div class="wearable-heading">
+    <div><div class="card-kicker"><span class="kicker-icon wearable-kicker">⌁</span> SIMULATED WEARABLE DATA</div><h2>Activity and sleep</h2><p>These trends feed the separate wearable review rule above; they do not alter the ECG result or predict stroke.</p></div>
+    <form method="post" action="/dashboard/patients/{{ patient.id }}/wearables/simulate"><button class="simulate-button" type="submit"><span aria-hidden="true">＋</span> Simulate next reading</button></form>
+  </div>
+  {% if wearable_summary %}
+  <div class="wearable-metrics">
+    {% for key in ['steps', 'sleep', 'resting_hr', 'hrv'] %}
+    {% set metric = wearable_summary[key] %}
+    <article class="wearable-metric"><div class="wearable-metric-top"><span class="wearable-name">{{ metric.label }}</span><span class="wearable-symbol symbol-{{ key }}">{{ {'steps':'↗','sleep':'◒','resting_hr':'♡','hrv':'⌁'}[key] }}</span></div><div class="wearable-value">{{ metric.value }}<small>{{ metric.unit }}</small></div><div class="wearable-change">{{ metric.change }}</div></article>
+    {% endfor %}
+  </div>
+  <details class="wearable-trends-disclosure">
+    <summary>View activity trends <span>Steps, sleep, resting heart rate, and HRV</span></summary>
+  <div class="wearable-chart-grid">
+    <div class="wearable-chart"><div class="mini-chart-heading"><strong>Steps</strong><span>per day</span></div><div class="mini-chart-wrap"><canvas id="stepsChart"></canvas></div></div>
+    <div class="wearable-chart"><div class="mini-chart-heading"><strong>Sleep</strong><span>hours</span></div><div class="mini-chart-wrap"><canvas id="sleepChart"></canvas></div></div>
+    <div class="wearable-chart"><div class="mini-chart-heading"><strong>Resting heart rate</strong><span>bpm</span></div><div class="mini-chart-wrap"><canvas id="restingHrChart"></canvas></div></div>
+    <div class="wearable-chart"><div class="mini-chart-heading"><strong>HRV</strong><span>ms</span></div><div class="mini-chart-wrap"><canvas id="hrvChart"></canvas></div></div>
+  </div>
+  </details>
+  {% else %}
+      <div class="wearable-empty"><span>⌁</span><strong>No wearable readings yet</strong><small>Add a simulated reading to see the trend.</small></div>
+  {% endif %}
+</section>
+
+<details id="habits" class="detail-card guidance-card collapsible-section patient-page-section">
+  <summary class="disclosure-summary guidance-header">
+    <div><div class="card-kicker"><span class="kicker-icon guidance-kicker">✦</span> HEALTHY HABITS</div><h2>Small steps for heart health</h2><p>General tips for adults—not a personal treatment plan.</p></div>
+    {% if latest and latest.alert_level == 'high' %}
+    <span class="guidance-band guidance-high"><span class="badge-dot"></span>High band</span>
+    {% elif latest and latest.alert_level == 'moderate' %}
+    <span class="guidance-band guidance-moderate"><span class="badge-dot"></span>Moderate band</span>
+    {% elif latest and latest.alert_level == 'inconclusive' %}
+    <span class="guidance-band guidance-neutral"><span class="badge-dot"></span>ECG inconclusive</span>
+    {% elif latest %}
+    <span class="guidance-band guidance-low"><span class="badge-dot"></span>Low band</span>
+    {% else %}
+    <span class="guidance-band guidance-neutral">No band yet</span>
+    {% endif %}
+    <span class="disclosure-toggle" aria-hidden="true"></span>
+  </summary>
+  <div class="disclosure-body">
+
+  {% if latest and latest.alert_level == 'inconclusive' %}
+  <div class="guidance-callout callout-neutral"><strong>This sample did not support a review band.</strong> The classifier found another rhythm, noise, or low confidence. Review the sample with a qualified clinician; this result does not identify a patient's health.</div>
+  {% elif latest and latest.alert_level == 'high' %}
+  <div class="guidance-callout callout-high"><strong>Review this sample result with a healthcare professional.</strong> It does not diagnose AFib or predict this person’s stroke risk. Do not use it to change medication or set an exercise goal.</div>
+  {% elif latest and latest.alert_level == 'moderate' %}
+  <div class="guidance-callout callout-moderate"><strong>Discuss this sample result with a healthcare professional</strong> alongside a real ECG and health history. This label is not a medical risk category.</div>
+  {% elif latest %}
+  <div class="guidance-callout callout-low"><strong>Keep up routine care and healthy habits.</strong> A low label cannot rule out AFib or stroke risk.</div>
+  {% else %}
+  <div class="guidance-callout callout-neutral">This profile has no assessment yet. The general wellness information below is not a substitute for individual clinical advice.</div>
+  {% endif %}
+
+  <div class="guidance-grid">
+    <article class="guidance-item">
+      <div class="guidance-icon food-icon">⌂</div>
+      <div><h3>Build a balanced plate</h3><p>Choose a variety of foods, including vegetables, whole grains, pulses or beans, fruit, and modest portions of nuts or seeds. Keep added sugar, salt, and cooking oil modest. Personal needs can differ with medical conditions.</p><a href="https://www.nin.res.in/dietaryguidelines/pdfjs/locale/DGI_2024.pdf" target="_blank" rel="noopener noreferrer">ICMR–NIN Dietary Guidelines for Indians <span aria-hidden="true">↗</span></a></div>
+    </article>
+    <article class="guidance-item">
+      <div class="guidance-icon move-icon">↗</div>
+      <div><h3>Build movement through the week</h3><p>WHO guidance for adults: aim for 150–300 minutes of moderate activity weekly, or an equivalent amount of vigorous activity. Add muscle-strengthening activity on 2 or more days. Adapt activity to your ability and care plan.</p><a href="https://www.who.int/initiatives/behealthy/physical-activity" target="_blank" rel="noopener noreferrer">WHO physical activity guidance <span aria-hidden="true">↗</span></a></div>
+    </article>
+  </div>
+  <div class="steps-note"><span class="steps-note-icon">i</span><span><strong>About step goals:</strong> steps appear here as a personal trend. No daily target is prescribed; ask a healthcare professional for a goal that fits your health and mobility.</span></div>
+  </div>
+</details>
+
+<details id="sample-history" class="detail-card history-card collapsible-section patient-page-section">
+  <summary class="disclosure-summary history-disclosure-summary">
+    <div><div class="card-kicker">PUBLIC ECG SAMPLE HISTORY</div><h2>Result and review timeline</h2><p>{{ history | length }} samples · newest first</p></div>
+    <span class="disclosure-toggle" aria-hidden="true"></span>
+  </summary>
+  <div class="disclosure-body">
+  <p class="history-caption">These are randomly assigned public ECG samples for a simulated profile, not the profile's own recordings. The timeline compares model outputs and review notes; it does not show changes in a real patient's health.</p>
+  {% if history %}<div class="chart-wrap"><canvas id="historyChart" height="105" aria-label="AFib model probability for sampled ECG windows"></canvas></div>{% else %}<div class="empty-chart">No ECG windows available for this profile.</div>{% endif %}
+  {% if history %}
+  <div class="timeline-intro">
+    <div><strong>What changed and clinician follow-up</strong><span>Latest sample first · compared with the previous public sample</span></div>
+    <span class="timeline-count">{{ history | length }} results</span>
+  </div>
+  <ol class="assessment-timeline">
+    {% for item in history | reverse %}
+    <li class="assessment-timeline-item">
+      <span class="timeline-marker" aria-hidden="true"></span>
+      <article class="timeline-entry">
+        <div class="timeline-entry-header">
+          <div class="timeline-date"><strong>{{ item.date }}</strong><span>{{ item.time }}{% if item.ecg_record %} · {{ item.ecg_record }}{% endif %}</span></div>
+          <span class="badge badge-{{ item.alert_level }}"><span class="badge-dot"></span>{% if item.alert_level == 'inconclusive' %}Inconclusive{% else %}{{ item.alert_level }} band{% endif %}</span>
+        </div>
+        <p class="timeline-change">{{ item.change_summary }}</p>
+        <div class="timeline-values">
+          <span>ECG output <strong>{{ {'afib_pattern':'AFib pattern','no_afib_pattern':'No AFib pattern','other_rhythm':'Other rhythm · inconclusive','noisy_recording':'Noisy · inconclusive','inconclusive_low_confidence':'Low confidence · inconclusive','legacy_binary_model':'Legacy model · inconclusive'}.get(item.ecg_result or '', 'Earlier binary result') }}</strong></span>
+          <span>AFib model probability <strong>{{ item.afib_probability }}%</strong></span>
+          <span>Experimental combined score <strong>{% if item.fused_risk_score is not none %}{{ item.fused_risk_score }}{% else %}—{% endif %}</strong></span>
+        </div>
+        {% if item.reviewed_at %}
+        <div class="timeline-review timeline-reviewed"><span class="timeline-review-dot"></span><div><strong>{{ {'reviewed':'Reviewed','repeat_sample':'Repeat sample','follow_up':'Follow-up discussion'}.get(item.review_disposition or 'reviewed', 'Reviewed') }} by {{ item.reviewer_name or 'reviewer identity not verified' }} · {{ item.reviewed_at }}</strong>{% if item.review_note %}<p>{{ item.review_note }}</p>{% endif %}</div></div>
+        {% else %}
+        <div class="timeline-review timeline-pending"><span class="timeline-review-dot"></span><strong>Awaiting clinician review</strong></div>
+        {% endif %}
+      </article>
+    </li>
+    {% endfor %}
+  </ol>
+  <div class="record-list-heading"><strong>Open an ECG sample</strong><span>Public recording · sample only</span></div>
+  <div class="ecg-record-list">
+    {% set record_state = namespace(found=false) %}
+    {% for item in history %}
+    {% if item.ecg_record %}
+    {% set record_state.found = true %}
+    <div class="ecg-record-row"><span class="record-wave-icon">⌁</span><span class="record-row-main"><strong>{{ item.ecg_record }}</strong><small>{{ item.date }} · AFib-class probability {{ item.afib_probability }}%</small></span><button class="ecg-inspect-button" type="button" data-record="{{ item.ecg_record }}">Inspect ECG <span aria-hidden="true">→</span></button></div>
+    {% endif %}
+    {% endfor %}
+    {% if not record_state.found %}
+    <div class="no-records">No ECG recordings are linked to this profile yet.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+  </div>
+</details>
+
+<section id="ecgReplayPanel" class="detail-card ecg-replay-card" hidden aria-live="polite">
+  <div class="replay-heading"><div><div class="card-kicker"><span class="kicker-icon replay-kicker">⌁</span> RECORDING INSPECTOR</div><h2>ECG replay <span id="replayRecordName"></span></h2><p id="replayDataNote">Randomly assigned public ECG sample for this walkthrough; it is not this profile's ECG.</p></div><button id="closeReplay" class="replay-close" type="button" aria-label="Close ECG inspector">×</button></div>
+  <div class="replay-summary">
+    <div class="replay-stat"><span>AFib class probability</span><strong id="replayProbability">—</strong></div>
+    <div class="replay-stat"><span>Classifier result</span><strong id="replayResult">—</strong></div>
+    <div class="replay-stat"><span>Detected R peaks</span><strong id="replayPeakCount">—</strong></div>
+    <div class="replay-stat"><span>Recording length</span><strong id="replayDuration">—</strong></div>
+    <div class="replay-controls"><button id="playECGReplay" class="simulate-button" type="button" disabled>▶ Play signal</button><span id="replayClock">—</span></div>
+  </div>
+  <div class="replay-chart-wrap"><canvas id="ecgTraceChart" aria-label="ECG waveform with detected heartbeat markers"></canvas></div>
+  <div class="trace-legend"><span><i class="legend-trace"></i> Cleaned ECG signal <small>(relative units)</small></span><span><i class="legend-rpeak"></i> Detected R peak</span></div>
+  <div class="explainability-heading"><div><h3>What influenced the model output?</h3><p>Largest per-feature contributions on the model’s raw score (log-odds) scale.</p></div><span class="explain-label">MODEL EXPLANATION</span></div>
+  <div id="featureExplanationList" class="feature-explanation-list"></div>
+  <div class="contribution-note">Positive contributions push this classifier toward the AFib class; negative contributions push away. These are model-specific signals, not clinical reasons or causal findings.</div>
+</section>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+{% if history %}
+<script id="wearableHistoryJson" type="application/json">{{ wearable_history | tojson }}</script>
+<script id="ecgHistoryJson" type="application/json">{{ history | tojson }}</script>
+<script>
+  const wearableData = JSON.parse(document.getElementById("wearableHistoryJson").textContent || "[]");
+  const wearableCharts = [
+    ["stepsChart", "steps", "#0c7776"],
+    ["sleepChart", "sleep_hours", "#6683c4"],
+    ["restingHrChart", "resting_hr", "#cf826c"],
+    ["hrvChart", "hrv_ms", "#58a27e"]
+  ];
+  if (window.Chart) {
+    wearableCharts.forEach(([id, field, color]) => {
+      const canvas = document.getElementById(id);
+      if (!canvas || !wearableData.length) return;
+      new Chart(canvas, {
+        type: "line",
+        data: {
+          labels: wearableData.map(point => point.date),
+          datasets: [{ data: wearableData.map(point => point[field]), borderColor: color, backgroundColor: `${color}18`, fill: true, tension: .35, pointRadius: 2, pointHoverRadius: 4, borderWidth: 2 }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { displayColors: false } },
+          scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 4, color: "#91a0a0", font: { size: 9 } } }, y: { grid: { color: "#eff3f1" }, ticks: { maxTicksLimit: 3, color: "#91a0a0", font: { size: 9 } } } }
+        }
+      });
+    });
+  }
+
+  const historyData = JSON.parse(document.getElementById("ecgHistoryJson").textContent || "[]");
+  const chartCanvas = document.getElementById("historyChart");
+  if (window.Chart && chartCanvas) {
+    new Chart(chartCanvas, {
+      type: "line",
+      data: {
+        labels: historyData.map(h => h.date),
+        datasets: [{
+          label: "AFib class probability",
+          data: historyData.map(h => h.afib_probability),
+          borderColor: "#0c7776",
+          backgroundColor: "rgba(12,119,118,.10)",
+          pointBackgroundColor: "#fff",
+          pointBorderColor: "#0c7776",
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          tension: .35,
+          fill: true
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: item => ` ${item.raw}%` } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: "#7a8c8d" } },
+          y: { min: 0, max: 100, ticks: { color: "#7a8c8d", callback: value => `${value}%` }, grid: { color: "#edf1ef" } }
+        }
+      }
+    });
+  }
+
+  const reviewForm = document.getElementById("clinicianReviewForm");
+  if (reviewForm) {
+    reviewForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      const submitButton = document.getElementById("markReviewedButton");
+      const feedback = document.getElementById("reviewFeedback");
+      const reviewState = document.getElementById("reviewState");
+      submitButton.disabled = true;
+      submitButton.textContent = "Saving review…";
+      feedback.textContent = "Saving review…";
+      try {
+        const response = await fetch(reviewForm.dataset.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reviewer_name: document.getElementById("reviewerName").value,
+            disposition: document.getElementById("reviewDisposition").value,
+            note: document.getElementById("reviewNote").value
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Could not save the review.");
+        reviewState.className = "review-state-pill reviewed-state";
+        const dot = document.createElement("span");
+        dot.className = "review-state-dot";
+        const dispositionLabels = { reviewed: "Reviewed", repeat_sample: "Repeat sample", follow_up: "Follow-up discussion" };
+        reviewState.replaceChildren(dot, document.createTextNode(`${dispositionLabels[result.status]} · ${new Date(result.reviewed_at).toLocaleString()}`));
+        feedback.textContent = result.authenticated
+          ? `Review saved under shared account ${result.reviewer_name}.`
+          : `Review saved under ${result.reviewer_name}. This label is not identity-verified.`;
+        submitButton.textContent = "Save review update →";
+        let reviewHistory = document.querySelector(".review-history");
+        if (!reviewHistory) {
+          reviewHistory = document.createElement("div");
+          reviewHistory.className = "review-history";
+          const historyHeading = document.createElement("strong");
+          historyHeading.textContent = "Review activity";
+          const historyList = document.createElement("ul");
+          historyList.id = "reviewEventList";
+          reviewHistory.append(historyHeading, historyList);
+          reviewForm.after(reviewHistory);
+        }
+        const historyList = document.getElementById("reviewEventList");
+        const historyItem = document.createElement("li");
+        const historySummary = document.createElement("span");
+        historySummary.textContent = `${new Date(result.reviewed_at).toLocaleString()} · ${result.reviewer_name} · ${dispositionLabels[result.status]}`;
+        historyItem.append(historySummary);
+        const reviewNote = document.getElementById("reviewNote").value.trim();
+        if (reviewNote) {
+          const note = document.createElement("small");
+          note.textContent = reviewNote;
+          historyItem.append(note);
+        }
+        historyList.append(historyItem);
+      } catch (error) {
+        feedback.textContent = error.message;
+        submitButton.textContent = "Try again →";
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+  }
+
+  const replayPanel = document.getElementById("ecgReplayPanel");
+  const inspectButtons = [...document.querySelectorAll(".ecg-inspect-button")];
+  const replayButton = document.getElementById("playECGReplay");
+  const replayClock = document.getElementById("replayClock");
+  const featureList = document.getElementById("featureExplanationList");
+  let replayChart = null;
+  let replayData = null;
+  let playbackFrame = null;
+
+  function drawStaticECG(canvas, data) {
+    const waveform = data.waveform || [];
+    if (!waveform.length) return;
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(rect.width, 320);
+    const height = Math.max(rect.height, 210);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    const margin = { top: 18, right: 14, bottom: 34, left: 48 };
+    const plotWidth = width - margin.left - margin.right;
+    const plotHeight = height - margin.top - margin.bottom;
+    const duration = Math.max(Number(data.duration_seconds) || 0, Number(waveform[waveform.length - 1].x) || 1);
+    const values = waveform.map(point => Number(point.y)).filter(Number.isFinite);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const span = maxValue - minValue || 1;
+    const low = minValue - span * 0.08;
+    const high = maxValue + span * 0.08;
+    const xFor = seconds => margin.left + (Number(seconds) / duration) * plotWidth;
+    const yFor = value => margin.top + ((high - Number(value)) / (high - low)) * plotHeight;
+
+    ctx.font = '10px "Segoe UI", sans-serif';
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = "#edf2ef";
+    ctx.fillStyle = "#778b8b";
+    ctx.lineWidth = 1;
+    for (let index = 0; index <= 4; index += 1) {
+      const y = margin.top + (plotHeight * index) / 4;
+      const x = margin.left + (plotWidth * index) / 4;
+      ctx.beginPath();
+      ctx.moveTo(margin.left, y);
+      ctx.lineTo(width - margin.right, y);
+      ctx.stroke();
+      ctx.textAlign = "right";
+      ctx.fillText((high - ((high - low) * index) / 4).toFixed(1), margin.left - 7, y);
+      ctx.beginPath();
+      ctx.moveTo(x, margin.top);
+      ctx.lineTo(x, height - margin.bottom);
+      ctx.stroke();
+      ctx.textAlign = "center";
+      ctx.fillText(((duration * index) / 4).toFixed(1), x, height - margin.bottom + 13);
+    }
+
+    ctx.strokeStyle = "#0c7776";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    waveform.forEach((point, index) => {
+      const x = xFor(point.x);
+      const y = yFor(point.y);
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    ctx.fillStyle = "#d66f65";
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    (data.r_peaks || []).forEach(point => {
+      ctx.beginPath();
+      ctx.arc(xFor(point.x), yFor(point.y), 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+    ctx.fillStyle = "#6e8585";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("Time (seconds)", margin.left + plotWidth / 2, height - 2);
+  }
+
+  window.addEventListener("resize", () => {
+    if (replayData && !replayChart && !replayPanel.hidden) {
+      drawStaticECG(document.getElementById("ecgTraceChart"), replayData);
+    }
+  });
+
+  function playWaveform() {
+    if (!replayChart || !replayData) return;
+    if (playbackFrame) cancelAnimationFrame(playbackFrame);
+    replayButton.textContent = "↻ Replaying…";
+    const startTime = performance.now();
+    const speed = 6;
+    function drawFrame(now) {
+      const duration = replayData.duration_seconds;
+      const elapsed = Math.min(duration, ((now - startTime) / 1000) * speed);
+      replayChart.data.datasets[0].data = replayData.waveform.filter(point => point.x <= elapsed);
+      replayChart.data.datasets[1].data = replayData.r_peaks.filter(point => point.x <= elapsed);
+      replayChart.update("none");
+      replayClock.textContent = `${elapsed.toFixed(1)} s / ${duration.toFixed(1)} s · 6×`;
+      if (elapsed < duration) {
+        playbackFrame = requestAnimationFrame(drawFrame);
+      } else {
+        playbackFrame = null;
+        replayButton.textContent = "↻ Replay signal";
+      }
+    }
+    playbackFrame = requestAnimationFrame(drawFrame);
+  }
+
+  function renderFeatureExplanations(features) {
+    featureList.replaceChildren();
+    const largest = Math.max(...features.map(item => Math.abs(item.contribution)), 0.0001);
+    features.forEach(item => {
+      const positive = item.contribution >= 0;
+      const row = document.createElement("article");
+      row.className = "feature-explanation";
+      const details = document.createElement("div");
+      details.className = "feature-details";
+      const name = document.createElement("strong");
+      name.textContent = item.name.replaceAll("_", " ");
+      const rawValue = document.createElement("small");
+      rawValue.textContent = `Feature value ${Number(item.value).toFixed(3)}`;
+      details.append(name, rawValue);
+      const barTrack = document.createElement("div");
+      barTrack.className = "contribution-track";
+      const bar = document.createElement("span");
+      bar.className = positive ? "contribution-positive" : "contribution-negative";
+      bar.style.width = `${Math.max(4, Math.abs(item.contribution) / largest * 100)}%`;
+      barTrack.append(bar);
+      const contribution = document.createElement("strong");
+      contribution.className = positive ? "contribution-value positive-value" : "contribution-value negative-value";
+      contribution.textContent = `${positive ? "+" : ""}${Number(item.contribution).toFixed(3)}`;
+      row.append(details, barTrack, contribution);
+      featureList.append(row);
+    });
+  }
+
+  async function inspectRecording(recordName, button) {
+    inspectButtons.forEach(item => item.disabled = true);
+    if (playbackFrame) cancelAnimationFrame(playbackFrame);
+    playbackFrame = null;
+    if (replayChart) replayChart.destroy();
+    replayChart = null;
+    replayData = null;
+    replayPanel.hidden = false;
+    replayPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("replayRecordName").textContent = recordName;
+    document.getElementById("replayDataNote").textContent = "Loading public ECG sample and model explanation…";
+    document.getElementById("replayProbability").textContent = "—";
+    document.getElementById("replayPeakCount").textContent = "—";
+    document.getElementById("replayDuration").textContent = "—";
+    replayButton.disabled = true;
+    replayClock.textContent = "Loading…";
+    featureList.replaceChildren();
+    try {
+      const response = await fetch(`/api/ecg/${encodeURIComponent(recordName)}`);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || "Could not load this ECG recording.");
+      }
+      replayData = await response.json();
+      document.getElementById("replayDataNote").textContent = replayData.data_note;
+      document.getElementById("replayProbability").textContent = `${(replayData.probability * 100).toFixed(1)}%`;
+      const resultLabels = {
+        afib_pattern: "AFib pattern",
+        no_afib_pattern: "No AFib pattern",
+        other_rhythm: "Other rhythm · inconclusive",
+        noisy_recording: "Noisy · inconclusive",
+        inconclusive_low_confidence: "Low confidence · inconclusive",
+        legacy_binary_model: "Legacy binary model · inconclusive"
+      };
+      document.getElementById("replayResult").textContent = resultLabels[replayData.ecg_result] || "Unclassified";
+      document.getElementById("replayPeakCount").textContent = replayData.r_peaks.length;
+      document.getElementById("replayDuration").textContent = `${replayData.duration_seconds.toFixed(1)} sec`;
+      renderFeatureExplanations(replayData.explanations);
+
+      const canvas = document.getElementById("ecgTraceChart");
+      if (window.Chart && canvas) {
+        if (replayChart) replayChart.destroy();
+        const yValues = replayData.waveform.map(point => point.y);
+        const low = Math.min(...yValues);
+        const high = Math.max(...yValues);
+        const padding = (high - low) * 0.1 || 1;
+        replayChart = new Chart(canvas, {
+          type: "scatter",
+          data: { datasets: [
+            { label: "Cleaned ECG signal", data: [], showLine: true, borderColor: "#0c7776", borderWidth: 1.5, pointRadius: 0, tension: 0, order: 2 },
+            { label: "Detected R peak", data: [], backgroundColor: "#d66f65", borderColor: "#fff", borderWidth: 1.5, pointRadius: 4, order: 1 }
+          ] },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            parsing: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { title: items => `${items[0].parsed.x.toFixed(2)} sec` } } },
+            scales: {
+              x: { type: "linear", min: 0, max: replayData.duration_seconds, title: { display: true, text: "Time (seconds)" }, grid: { color: "#edf2ef" } },
+              y: { min: low - padding, max: high + padding, title: { display: true, text: "Relative amplitude" }, grid: { color: "#edf2ef" } }
+            }
+          }
+        });
+        replayButton.disabled = false;
+        playWaveform();
+      } else {
+        drawStaticECG(canvas, replayData);
+        replayClock.textContent = "Static preview";
+      }
+    } catch (error) {
+      document.getElementById("replayDataNote").textContent = error.message;
+      replayClock.textContent = "Could not load";
+    } finally {
+      inspectButtons.forEach(item => item.disabled = false);
+    }
+  }
+
+  inspectButtons.forEach(button => button.addEventListener("click", () => inspectRecording(button.dataset.record, button)));
+  replayButton.addEventListener("click", playWaveform);
+  document.getElementById("closeReplay").addEventListener("click", () => {
+    if (playbackFrame) cancelAnimationFrame(playbackFrame);
+    playbackFrame = null;
+    replayPanel.hidden = true;
+  });
+</script>
+{% endif %}
+<script>
+  document.querySelectorAll("[data-progress]").forEach(element => {
+    const progress = Number(element.dataset.progress);
+    if (Number.isFinite(progress)) element.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+  });
+</script>
+<script>
+  const preventionForm = document.getElementById("preventionRiskForm");
+  preventionForm?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const errorBox = document.getElementById("preventionError");
+    const resultBox = document.getElementById("preventionResult");
+    const submitButton = preventionForm.querySelector("button[type='submit']");
+    errorBox.hidden = true;
+    resultBox.hidden = true;
+    const form = new FormData(preventionForm);
+    const payload = {
+      age: Number(form.get("age")),
+      sex: form.get("sex"),
+      smoker: form.get("smoker") === "true",
+      systolic_bp: Number(form.get("systolic_bp")),
+      bmi: Number(form.get("bmi")),
+      prior_cvd: form.get("prior_cvd") === "true"
+    };
+    submitButton.disabled = true;
+    submitButton.textContent = "Calculating…";
+    try {
+      const response = await fetch(preventionForm.dataset.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || "Could not calculate the chart estimate.");
+      document.getElementById("preventionPercent").textContent = `${data.percent}%`;
+      document.getElementById("preventionBand").textContent = data.band;
+      document.getElementById("preventionNote").textContent = data.note;
+      const actions = document.getElementById("preventionActions");
+      actions.replaceChildren();
+      data.actions.forEach(action => {
+        const item = document.createElement("li");
+        item.textContent = action;
+        actions.append(item);
+      });
+      resultBox.hidden = false;
+      resultBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (error) {
+      errorBox.textContent = error.message;
+      errorBox.hidden = false;
+    } finally {
+      submitButton.disabled = false;
+      submitButton.innerHTML = 'Estimate from WHO chart <span aria-hidden="true">→</span>';
+    }
+  });
+</script>
+<script>
+  document.querySelectorAll(".wearable-trends-disclosure, .history-card").forEach(disclosure => {
+    disclosure.addEventListener("toggle", () => {
+      if (disclosure.open) window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
+    });
+  });
+</script>
+{% endblock %}

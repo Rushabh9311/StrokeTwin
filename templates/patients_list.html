@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Patient overview — StrokeTwin{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <div class="eyebrow"><span class="eyebrow-line"></span> DIGITAL HEART HEALTH</div>
+    <h1>Patient overview<span class="heading-period">.</span></h1>
+    <p class="page-lede">Review ECG samples and wearable suggestions, or open a profile for its full timeline and tools.</p>
+  </div>
+  <div class="overview-actions">
+    <a class="review-queue-entry" href="/dashboard/review-queue"><span><strong>Review queue</strong><small>Wearable suggestions</small></span><b>{{ open_watch_alert_count }}</b></a>
+    <div class="dataset-chip"><span class="dataset-icon">✳</span><span><strong>Data sources</strong><small>Synthetic profiles · public ECGs</small></span></div>
+  </div>
+</section>
+
+<section class="notice overview-notice" role="note">
+  <span class="notice-icon">i</span>
+  <p><strong>Research workflow using sample data.</strong> The profile, wearable readings and public ECG sample do not belong to the same real person. Model output is not a diagnosis or a personal stroke prediction.</p>
+</section>
+
+<section class="overview-panel" aria-label="Filter sample profiles by experimental band">
+  <div class="overview-panel-heading">
+    <div><div class="eyebrow">SAMPLE WORK QUEUE</div><h2>Browse profiles</h2></div>
+    <span class="queue-count">{{ filtered_total }} shown</span>
+  </div>
+  <nav class="band-filters" aria-label="Filter by experimental band">
+    <a class="band-filter{% if band == 'all' %} active{% endif %}" href="/dashboard?band=all&amp;search={{ search_query | urlencode }}"{% if band == 'all' %} aria-current="page"{% endif %}><span>All profiles</span><strong>{{ total }}</strong></a>
+    <a class="band-filter{% if band == 'high' %} active{% endif %}" href="/dashboard?band=high&amp;search={{ search_query | urlencode }}"{% if band == 'high' %} aria-current="page"{% endif %}><span>High band</span><strong>{{ counts.high }}</strong></a>
+    <a class="band-filter{% if band == 'moderate' %} active{% endif %}" href="/dashboard?band=moderate&amp;search={{ search_query | urlencode }}"{% if band == 'moderate' %} aria-current="page"{% endif %}><span>Moderate band</span><strong>{{ counts.moderate }}</strong></a>
+    <a class="band-filter{% if band == 'low' %} active{% endif %}" href="/dashboard?band=low&amp;search={{ search_query | urlencode }}"{% if band == 'low' %} aria-current="page"{% endif %}><span>Low band</span><strong>{{ counts.low }}</strong></a>
+    <a class="band-filter{% if band == 'inconclusive' %} active{% endif %}" href="/dashboard?band=inconclusive&amp;search={{ search_query | urlencode }}"{% if band == 'inconclusive' %} aria-current="page"{% endif %}><span>Inconclusive ECG</span><strong>{{ counts.inconclusive }}</strong></a>
+  </nav>
+</section>
+
+<section class="section-heading overview-list-heading">
+  <div><div class="eyebrow">LATEST SAMPLE RESULTS</div><h2>Profiles</h2></div>
+  <form id="patientFilters" class="table-tools" method="get" action="/dashboard">
+    <label class="search-box"><span aria-hidden="true">⌕</span><input id="patientSearch" name="search" type="search" value="{{ search_query }}" placeholder="Search ID, age or sex" aria-label="Search patient profiles"></label>
+    <input type="hidden" name="band" value="{{ band }}">
+    <button class="table-filter-submit" type="submit">Search</button>
+  </form>
+</section>
+
+<section class="table-card">
+  <div class="table-scroll">
+    <table class="patient-table overview-table">
+      <thead><tr><th>Profile</th><th>Public ECG sample</th><th>Wearable trend</th><th>Experimental band</th><th><span class="sr-only">Open profile</span></th></tr></thead>
+      <tbody id="patientRows">
+        {% for p in patients %}
+        <tr class="patient-row" data-level="{{ p.alert_level }}" data-search="{{ p.id }} {{ p.age }} {{ p.sex|lower }}">
+          <td><a class="patient-link" href="/dashboard/patients/{{ p.id }}"><span class="avatar">{{ '%02d'|format(p.id % 100) }}</span><span><strong>Patient #{{ p.id }}</strong><small>{{ p.age }} years · {{ 'Female' if p.sex == 'F' else 'Male' }} · simulated profile</small></span></a></td>
+          <td><span class="probability">{{ (p.afib_probability * 100) | round(1) }}<span>%</span></span><small class="cell-caption">{{ {'afib_pattern':'AFib-like pattern','no_afib_pattern':'No AFib-like pattern','other_rhythm':'Other rhythm · inconclusive','noisy_recording':'Noisy sample · inconclusive','inconclusive_low_confidence':'Low confidence · inconclusive','legacy_binary_model':'Older model · inconclusive'}.get(p.ecg_result or '', 'Sample result unavailable') }}</small></td>
+          <td>
+            {% if p.wearable_watch.status == 'cross_stream_watch' %}<span class="watch-label watch-label-active">Review suggested</span>
+            {% elif p.wearable_watch.status == 'wearable_trend' %}<span class="watch-label">Wearable trend changed</span>
+            {% elif p.wearable_watch.status == 'insufficient' %}<span class="watch-label">More readings needed</span>
+            {% else %}<span class="watch-label">Watch criteria not met</span>{% endif %}
+            {% if p.wearable_watch.status != 'insufficient' %}<small class="cell-caption">{{ p.wearable_watch.crossed_count }} of 4 illustrative thresholds crossed</small>{% endif %}
+          </td>
+          <td><span class="badge badge-{{ p.alert_level }}"><span class="badge-dot"></span>{% if p.alert_level == 'inconclusive' %}Inconclusive{% else %}{{ p.alert_level|capitalize }} band{% endif %}</span><small class="cell-caption">Experimental label · not a clinical risk level</small></td>
+          <td><a class="row-arrow" href="/dashboard/patients/{{ p.id }}" aria-label="Open patient {{ p.id }}">Open →</a></td>
+        </tr>
+        {% endfor %}
+        {% if not patients %}
+        <tr><td colspan="5" class="empty-state"><span class="empty-icon">◌</span><strong>{% if filtered_total == 0 and (search_query or band != 'all') %}No matching profiles{% else %}No results to show yet{% endif %}</strong><small>{% if search_query or band != 'all' %}Try another search or choose a different experimental band.{% else %}Load the patient profiles and generate ECG samples to fill this list.{% endif %}</small></td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+  <div class="table-bottom"><span>Showing {{ (current_page - 1) * page_size + 1 if filtered_total else 0 }}–{{ [current_page * page_size, filtered_total] | min }} of {{ filtered_total }} profiles</span><span>Open a profile for scores, review notes, prevention estimate, wearables and history.</span></div>
+</section>
+{% if page_count > 1 %}
+<nav class="pagination-bar" aria-label="Patient list pages">
+  {% if current_page > 1 %}<a href="/dashboard?page={{ current_page - 1 }}&amp;band={{ band }}&amp;search={{ search_query | urlencode }}" rel="prev">← Previous</a>{% else %}<span class="page-disabled">← Previous</span>{% endif %}
+  <span>Page {{ current_page }} of {{ page_count }}</span>
+  {% if current_page < page_count %}<a href="/dashboard?page={{ current_page + 1 }}&amp;band={{ band }}&amp;search={{ search_query | urlencode }}" rel="next">Next →</a>{% else %}<span class="page-disabled">Next →</span>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f4f6f1" />
+  <title>{% block title %}StrokeTwin{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=12" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="StrokeTwin home">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+      <span class="brand-copy"><strong>StrokeTwin</strong><small>HEART HEALTH WORKSPACE</small></span>
+    </a>
+    <div class="topbar-right">
+      <span class="prototype-pill"><span class="pulse-dot"></span> Research prototype</span>
+      <a class="nav-link" href="/dashboard/review-queue">Review queue <span aria-hidden="true">↗</span></a>
+      <a class="nav-link" href="/dashboard/model-card">Model details <span aria-hidden="true">↗</span></a>
+      <a class="nav-link" href="/dashboard">Patient overview <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">StrokeTwin <span>•</span> Synthetic health data + simulated wearable + public ECG <span class="footer-right">For research use · Not for clinical use</span></footer>
+</body>
+</html>

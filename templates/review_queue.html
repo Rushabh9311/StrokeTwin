@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Review queue — StrokeTwin{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <div class="eyebrow"><span class="eyebrow-line"></span> WEARABLE REVIEW WORKFLOW</div>
+    <h1>Review queue<span class="heading-period">.</span></h1>
+    <p class="page-lede">Review suggestions come only from the scripted wearable watch rule.</p>
+  </div>
+  <a class="back-link" href="/dashboard">← Patient overview</a>
+</section>
+
+<section class="notice overview-notice" role="note">
+  <span class="notice-icon">i</span>
+  <p><strong>Research workflow suggestions, not medical alerts.</strong> They are triggered by illustrative wearable changes plus synthetic profile context. They do not indicate stroke risk, diagnosis, or an emergency. The unrelated public ECG does not trigger this queue.</p>
+</section>
+
+<section class="review-queue-summary" aria-label="Review queue summary">
+  <div><strong>{{ open_watch_alert_count }}</strong><span>open review suggestions</span></div>
+  <div><strong>{{ recently_reviewed|length }}</strong><span>recently marked reviewed</span></div>
+</section>
+{% if total_open > 0 %}
+<p class="queue-result-count">Showing {{ (page - 1) * page_size + 1 }}–{{ [page * page_size, total_open]|min }} of {{ total_open }} open suggestions · strongest pattern matches first</p>
+{% endif %}
+
+{% if alerts %}
+<section class="watch-alert-list" aria-label="Open wearable review suggestions">
+  {% for item in alerts %}
+  {% set alert = item.alert %}
+  {% set patient = item.patient %}
+  {% set snapshot = item.snapshot %}
+  <article class="watch-alert-card">
+    <div class="watch-alert-topline">
+      <div>
+        <span class="watch-alert-kicker">REVIEW SUGGESTED · SCRIPTED WEARABLE WATCH</span>
+        <h2>Patient #{{ patient.id }}</h2>
+        <p>{{ patient.age }} years · {{ 'Female' if patient.sex == 'F' else 'Male' }} · synthetic profile</p>
+      </div>
+      <time datetime="{{ alert.trigger_timestamp.isoformat() }}">Sample {{ alert.trigger_timestamp.strftime('%b %d, %Y · %H:%M') }}</time>
+    </div>
+    <p class="watch-alert-summary">{{ snapshot.summary }}</p>
+    <div class="watch-alert-detail-grid">
+      <div>
+        <h3>Changes behind this suggestion</h3>
+        <div class="watch-alert-changes">
+          {% for change in snapshot.changes %}
+          <div class="watch-alert-change">
+            <strong>{{ change.label }}</strong>
+            <span>{{ change.baseline }} {{ change.unit }} <span aria-hidden="true">→</span> {{ change.recent }} {{ change.unit }}</span>
+            <small>{{ change.delta_pct }}% change · illustrative threshold {{ 'increase' if change.direction == 'increase' else 'decrease' }} of {{ change.threshold_pct }}%</small>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="watch-alert-context">
+        <h3>Profile context used by the rule</h3>
+        <ul>{% for factor in snapshot.context_factors %}<li>{{ factor }}</li>{% endfor %}</ul>
+      </div>
+    </div>
+    <div class="watch-alert-actions">
+      <a class="row-arrow" href="/dashboard/patients/{{ patient.id }}">Open profile →</a>
+      <form method="post" action="/dashboard/review-queue/{{ alert.id }}/mark-reviewed">
+        <button class="mark-watch-reviewed" type="submit">Mark reviewed</button>
+      </form>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<section class="review-queue-empty">
+  <span class="empty-icon">◌</span>
+  <h2>No open review suggestions</h2>
+  <p>When the scripted wearable rule is triggered, the profile will appear here. This prototype does not monitor real health data.</p>
+  <a class="row-arrow" href="/dashboard">Return to patient overview →</a>
+</section>
+{% endif %}
+
+{% if page_count > 1 %}
+<nav class="queue-pagination" aria-label="Review queue pages">
+  {% if page > 1 %}<a href="/dashboard/review-queue?page={{ page - 1 }}" aria-label="Previous page">← Previous</a>{% else %}<span class="disabled">← Previous</span>{% endif %}
+  <span>Page {{ page }} of {{ page_count }}</span>
+  {% if page < page_count %}<a href="/dashboard/review-queue?page={{ page + 1 }}" aria-label="Next page">Next →</a>{% else %}<span class="disabled">Next →</span>{% endif %}
+</nav>
+{% endif %}
+
+{% if recently_reviewed %}
+<details class="reviewed-watch-history">
+  <summary>Recently marked reviewed <span>{{ recently_reviewed|length }}</span></summary>
+  <ul>
+    {% for item in recently_reviewed %}
+    <li><a href="/dashboard/patients/{{ item.patient.id }}">Patient #{{ item.patient.id }}</a><span>{{ item.alert.reviewed_at.strftime('%b %d, %Y · %H:%M') }}</span><small>{% if item.alert.reviewer_name %}{{ item.alert.reviewer_name }} · shared account{% else %}Local review · reviewer identity not verified{% endif %}</small></li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+{% endblock %}
