@@ -92,16 +92,6 @@ Set both STROKETWIN_DEMO_USER and STROKETWIN_DEMO_PASSWORD to enable the optiona
 
 See DATASETS.md. The source-code license does not relicense PhysioNet data or third-party assets. Verify source data terms before publishing copies of raw datasets in a public repository.
 
-## Repository submission checklist
-
-- [x] Add team, institution, and member details above.
-- [ ] Confirm the PhysioNet and Synthea data terms, and verify raw data remains excluded from Git unless redistribution is permitted.
-- [x] Add the unlisted walkthrough video link.
-- [x] Add the final presentation deck.
-- [ ] Review the architecture handout and replace any remaining team-specific details.
-- [x] Push the project to GitHub.
-- [ ] Confirm the repository is public and test a clean install on another computer.
-
 ## Boundaries and next research step
 
 The cross-stream watch is a transparent synthetic demo rule, not a trained predictor of stroke, AFib, or another future event. Moving toward an actual outcome forecast requires a paired longitudinal dataset with time-aligned clinical context, wearable signals, and defined outcome labels, followed by patient-level evaluation and external validation. Do not use this prototype to diagnose, triage, change medication, or make treatment decisions.
