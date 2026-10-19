@@ -11,9 +11,9 @@ Fill these in before submitting:
 - **Team name:** Entropy
 - **College / incubator:** DY Patil College of Engineering, Pune
 - **Team members:** Rushabh Chopada and Anjali Patil
-- **Project title:** StrokeTwin — [CONFIRM FINAL SUBMISSION TITLE]
-- **20-minute demo video:** [ADD UNLISTED VIDEO LINK]
-- **Public repository:** [ADD PUBLIC GITHUB URL]
+- **Project title:** StrokeTwin
+- **20-minute demo video:** [Watch the unlisted project walkthrough](https://youtu.be/WW-ogzDEkn8)
+- **Public repository:** [github.com/Rushabh9311/StrokeTwin](https://github.com/Rushabh9311/StrokeTwin)
 - **Architecture handout:** [StrokeTwin_Architecture.pdf](StrokeTwin_Architecture.pdf)
 - **Presentation deck:** [StrokeTwin_Deck.pptx](StrokeTwin_Deck.pptx)
 
@@ -94,12 +94,13 @@ See DATASETS.md. The source-code license does not relicense PhysioNet data or th
 
 ## Repository submission checklist
 
-- [ ] Add team, institution, and member details above.
+- [x] Add team, institution, and member details above.
 - [ ] Confirm the PhysioNet and Synthea data terms, and verify raw data remains excluded from Git unless redistribution is permitted.
-- [ ] Add the 20-minute prototype walkthrough video.
+- [x] Add the unlisted walkthrough video link.
 - [x] Add the final presentation deck.
 - [ ] Review the architecture handout and replace any remaining team-specific details.
-- [ ] Create the public GitHub repository and confirm a clean install on another computer.
+- [x] Push the project to GitHub.
+- [ ] Confirm the repository is public and test a clean install on another computer.
 
 ## Boundaries and next research step
 
